@@ -6,4 +6,4 @@ profiles/__pycache__/
 *.pyd
 *.db
 .env
-.env.*
+.env.local
