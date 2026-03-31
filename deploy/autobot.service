@@ -1,16 +1,19 @@
 [Unit]
-Description=Auto Bot Telegram Bot
+Description=Auto Bot Telegram Service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=botuser
-WorkingDirectory=/opt/auto_bot
-EnvironmentFile=/etc/auto_bot.env
-ExecStart=/opt/auto_bot/.venv/bin/python main.py
-Restart=always
+User=SETUP_BOT_USER
+WorkingDirectory=SETUP_BOT_DIR
+EnvironmentFile=SETUP_BOT_ENV_FILE
+ExecStart=SETUP_BOT_DIR/.venv/bin/python main.py
+Restart=on-failure
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autobot
 
 [Install]
 WantedBy=multi-user.target
