@@ -1,5 +1,11 @@
 import importlib
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+load_dotenv(Path(__file__).with_name(".env"), override=False)
 
 
 def _load_profile_module():

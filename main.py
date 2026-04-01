@@ -1033,6 +1033,11 @@ async def reminder_loop(app: Application):
 
 
 def main():
+    if not config.TOKEN or config.TOKEN.startswith("PUT_"):
+        raise RuntimeError(
+            "BOT_TOKEN is not configured. Create a .env file from .env.example or set a real token in the active profile."
+        )
+
     app = Application.builder().token(config.TOKEN).build()
     app.job_queue.run_once(lambda ctx: asyncio.create_task(reminder_loop(app)), 1)
     app.add_handler(CommandHandler("start", start))
