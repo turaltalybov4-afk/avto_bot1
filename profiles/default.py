@@ -1,8 +1,8 @@
 # Default client profile for the bot.
 # Copy this file to a new file (for example, alfa_service.py) and change values.
 
-TOKEN = "PUT_BOT_TOKEN_HERE"
-MANAGERS = [111111111]
+TOKEN = "8610850100:AAG74HVtAKWbKvajSwIxWZhJrDGjZw7_Nq0"
+MANAGERS = [6271000700]
 DATABASE_FILE = "auto.db"
 
 COMPANY_NAME = "Автосервис"

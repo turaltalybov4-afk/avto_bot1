@@ -251,15 +251,18 @@ def build_upsell_prompt(user_id: int):
     selected_names = {item["name"] for item in get_selected_upsells(user_id)}
     service_price, upsell_total, total_price = calculate_booking_totals(user_id)
 
+    upsells = get_upsells_for_service(service["name"])
+
     lines = [
         f"Основная услуга: {service['name']} — {format_money(service_price)}₽",
-        "",
-        "💡 Можно добавить к записи:",
     ]
     rows = []
 
-    upsells = get_upsells_for_service(service["name"])
     if upsells:
+        lines.extend([
+            "",
+            "💡 Можно добавить к записи:",
+        ])
         for upsell in upsells:
             marker = "✅" if upsell["name"] in selected_names else "◻️"
             lines.append(f"{marker} {upsell['name']} — {format_money(upsell['price'])}₽")
@@ -272,8 +275,6 @@ def build_upsell_prompt(user_id: int):
                     )
                 ]
             )
-    else:
-        lines.append(config.NO_UPSELL_TEXT)
 
     if selected_names:
         lines.append("")
