@@ -1,0 +1,132 @@
+AUTO BOT - КОМАНДЫ ДЛЯ КОПИРОВАНИЯ (БЕЗ ССЫЛОК)
+
+КАК МЫ РАБОТАЕМ ДАЛЬШЕ
+- Я добавляю сюда новые команды по мере работы.
+- В чате я пишу тебе так: Номер -> Когда использовать -> Что вставить.
+- Ты копируешь только команду под нужным номером.
+
+БЫСТРАЯ ПОДСКАЗКА ПО НОМЕРАМ
+- Номер 3: первый запуск бота после настройки.
+- Номер 4: проверить, запустился ли бот.
+- Номер 6: смотреть ошибки и живой лог.
+- Номер 7: перезапуск после изменения настроек/кода.
+- Номер 8: остановка бота.
+
+ВАЖНО ПРО ОШИБКУ АКТИВАЦИИ
+- Если в пути есть "абочий стол" - это опечатка.
+- Правильно: "Рабочий стол".
+- Для запуска ботов теперь используй botctl.ps1 (без ручной активации venv).
+
+1) Подключение к VPS
+ssh root@IP_СЕРВЕРА
+
+2) Открыть env файл
+nano /etc/auto_bot.env
+
+3) Запустить сервис
+systemctl start autobot
+
+4) Проверить статус
+systemctl status autobot
+
+5) Включить автозапуск
+systemctl enable autobot
+
+6) Смотреть логи в реальном времени
+journalctl -u autobot -f
+
+7) Перезапустить сервис
+systemctl restart autobot
+
+8) Остановить сервис
+systemctl stop autobot
+
+9) Показать последние 100 строк лога
+journalctl -u autobot -n 100
+
+10) Обновить код и перезапустить
+cd /opt/auto_bot
+git pull origin main
+systemctl restart autobot
+
+11) Проверить, что файл базы создан
+ls -lah /var/lib/auto_bot
+
+12) Создать папку для баз (если нет)
+mkdir -p /var/lib/auto_bot
+
+13) Скачать проект на VPS
+git clone https://github.com/ТВОЙ_ЛОГИН/avto_bot1.git /tmp/setup_repo
+
+14) Запустить установщик на VPS
+bash /tmp/setup_repo/deploy/setup.sh
+
+================ ЛОКАЛЬНЫЙ ЗАПУСК НЕСКОЛЬКИХ БОТОВ (WINDOWS) ================
+
+15) Показать все профили
+.\botctl.ps1 list
+
+16) Запустить одного бота (пример)
+.\botctl.ps1 start default
+
+17) Запустить двух ботов сразу (пример)
+.\botctl.ps1 start default turbo_service
+
+18) Запустить все профили
+.\botctl.ps1 start-all
+
+19) Проверить, кто запущен
+.\botctl.ps1 status
+
+20) Остановить одного бота (пример)
+.\botctl.ps1 stop default
+
+21) Остановить всех ботов
+.\botctl.ps1 stop-all
+
+22) Смотреть лог конкретного бота (пример)
+Get-Content .\.bot_logs\default.log -Tail 80
+
+23) Если PowerShell ругается на запуск ps1, запусти так
+powershell -ExecutionPolicy Bypass -File .\botctl.ps1 list
+
+================ КАК ЗАКИНУТЬ БОТОВ НА VPS ================
+
+24) Локально отправить код в GitHub (выполнять на своем ПК)
+git add .
+git commit -m "deploy update"
+git push origin main
+
+25) На VPS: обновить код проекта
+cd /opt/auto_bot
+git pull origin main
+
+26) На VPS: перезапустить после обновления
+systemctl restart autobot
+systemctl status autobot
+
+27) На VPS: поставить второго бота как отдельный сервис
+BOT_USER=botuser2 BOT_DIR=/opt/auto_bot2 BOT_DATA_DIR=/var/lib/auto_bot2 BOT_ENV_FILE=/etc/auto_bot2.env SERVICE_NAME=autobot2 bash /tmp/setup_repo/deploy/setup.sh
+
+28) На VPS: открыть env второго бота
+nano /etc/auto_bot2.env
+
+29) На VPS: запустить и включить второго бота
+systemctl start autobot2
+systemctl enable autobot2
+systemctl status autobot2
+
+30) На VPS: смотреть логи второго бота
+journalctl -u autobot2 -f
+
+ОТДЕЛЬНАЯ БАЗА ДЛЯ НОВОГО КЛИЕНТА (ПРОСТО)
+1. В профиле клиента укажи DATABASE_FILE, например:
+	DATABASE_FILE = "auto_zhes.db"
+
+2. На VPS в env укажи путь, например:
+	AUTOBOT_DATABASE_FILE=/var/lib/auto_bot/auto_zhes.db
+
+3. Запусти/перезапусти сервис (номер 3 или 7).
+
+4. Файл базы создастся автоматически при первом запуске.
+	Вручную sqlite файл создавать НЕ нужно.
