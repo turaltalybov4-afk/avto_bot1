@@ -119,6 +119,18 @@ systemctl status autobot2
 30) На VPS: смотреть логи второго бота
 journalctl -u autobot2 -f
 
+31) На VPS: ОДНОЙ КОМАНДОЙ обновить + настроить + запустить 1-го бота
+BOT_TOKEN="ВСТАВЬ_ТОКЕН" AUTOBOT_PROFILE="default" AUTOBOT_MANAGERS="ВСТАВЬ_ID" AUTOBOT_DATABASE_FILE="/var/lib/auto_bot/auto_default.db" bash -lc 'set -e; mkdir -p /var/lib/auto_bot; cd /opt/auto_bot && git pull origin main; cat > /etc/auto_bot.env <<EOF
+BOT_TOKEN='$BOT_TOKEN'
+AUTOBOT_PROFILE='$AUTOBOT_PROFILE'
+AUTOBOT_MANAGERS='$AUTOBOT_MANAGERS'
+AUTOBOT_DATABASE_FILE='$AUTOBOT_DATABASE_FILE'
+EOF
+chmod 600 /etc/auto_bot.env; systemctl daemon-reload; systemctl enable autobot; systemctl restart autobot; systemctl status autobot --no-pager; echo "OK: bot deployed"'
+
+32) На VPS: быстрая проверка после шага 31
+journalctl -u autobot -n 60 --no-pager
+
 ОТДЕЛЬНАЯ БАЗА ДЛЯ НОВОГО КЛИЕНТА (ПРОСТО)
 1. В профиле клиента укажи DATABASE_FILE, например:
 	DATABASE_FILE = "auto_zhes.db"

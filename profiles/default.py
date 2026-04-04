@@ -5,7 +5,7 @@ TOKEN = "8610850100:AAG74HVtAKWbKvajSwIxWZhJrDGjZw7_Nq0"
 MANAGERS = [6271000700]
 DATABASE_FILE = "auto.db"
 
-COMPANY_NAME = "Автосервис"
+COMPANY_NAME = "АвтоССССервис"
 TAGLINE = "Быстрый и честный сервис без лишних работ"
 BUSINESS_HOURS = "Пн-Сб 09:00-21:00"
 BUSINESS_FEATURES = [
