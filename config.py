@@ -94,11 +94,11 @@ PROFILE_SLUG = PROFILE_NAME
 
 DEFAULT_DATABASE_FILE = "auto.db" if PROFILE_NAME == "default" else f"auto_{PROFILE_NAME}.db"
 
-# For multi-profile setups, profile values must have priority.
-# Environment variables are only used as fallback if profile fields are missing.
-TOKEN = _pick(_profile, "TOKEN", "") or _env_str("BOT_TOKEN", "")
-MANAGERS = _pick(_profile, "MANAGERS", []) or _env_list_of_ints("AUTOBOT_MANAGERS", [])
-DATABASE_FILE = _pick(_profile, "DATABASE_FILE", "") or _env_str("AUTOBOT_DATABASE_FILE", DEFAULT_DATABASE_FILE)
+# Environment values have priority for deployment simplicity.
+# Profile values are used as fallback defaults.
+TOKEN = _env_str("BOT_TOKEN", _pick(_profile, "TOKEN", ""))
+MANAGERS = _env_list_of_ints("AUTOBOT_MANAGERS", _pick(_profile, "MANAGERS", []))
+DATABASE_FILE = _env_str("AUTOBOT_DATABASE_FILE", _pick(_profile, "DATABASE_FILE", DEFAULT_DATABASE_FILE))
 
 COMPANY_NAME = _pick(_profile, "COMPANY_NAME", "Автосервис")
 TAGLINE = _pick(_profile, "TAGLINE", "")
