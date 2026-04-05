@@ -110,6 +110,7 @@ journalctl -u "\$SERVICE_NAME" -n 30 --no-pager
 
 Write-Host "[2/4] Deploy to VPS..." -ForegroundColor Green
 $target = "$SshUser@$ServerIp"
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
 $remoteCommand = "echo $encoded | base64 -d | bash"
 & ssh $target $remoteCommand
