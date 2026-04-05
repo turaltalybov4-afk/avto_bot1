@@ -152,6 +152,11 @@ powershell -ExecutionPolicy Bypass -File .\one_click_deploy.ps1 -ServerIp 146.10
 37) Быстрая проверка 2-го бота
 ssh root@146.103.42.126 "systemctl is-active autobot2; systemctl is-enabled autobot2; systemctl status autobot2 --no-pager"
 
+38) Самый надежный запуск 2-го бота (без длинной вставки)
+powershell -ExecutionPolicy Bypass -File .\deploy_autobot2.ps1
+
+После команды 38 вставь только токен 2-го бота в запросе "Paste TOKEN for autobot2".
+
 ОТДЕЛЬНАЯ БАЗА ДЛЯ НОВОГО КЛИЕНТА (ПРОСТО)
 1. В профиле клиента укажи DATABASE_FILE, например:
 	DATABASE_FILE = "auto_zhes.db"
