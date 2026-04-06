@@ -88,12 +88,28 @@ SKIP_BOOTSTRAP='$rSkipBootstrap'
 [ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin "\$BRANCH" || git clone "\$REPO_URL" /tmp/setup_repo
 
 if [ "\$SKIP_BOOTSTRAP" != "1" ] && [ ! -f "/etc/systemd/system/\$SERVICE_NAME.service" ]; then
-  printf "%s\n" "\$REPO_URL" | BOT_USER="\$BOT_USER" BOT_DIR="\$REPO_DIR" BOT_DATA_DIR="\$DATA_DIR" BOT_ENV_FILE="\$ENV_FILE" SERVICE_NAME="\$SERVICE_NAME" bash /tmp/setup_repo/deploy/setup.sh
+    if ! id "\$BOT_USER" > /dev/null 2>&1; then
+        useradd --system --no-create-home --shell /usr/sbin/nologin "\$BOT_USER"
+    fi
+
+    mkdir -p "\$REPO_DIR" "\$DATA_DIR"
+
+    cp /tmp/setup_repo/deploy/autobot.service "/etc/systemd/system/\$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_DIR|\$REPO_DIR|g" "/etc/systemd/system/\$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_USER|\$BOT_USER|g" "/etc/systemd/system/\$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_ENV_FILE|\$ENV_FILE|g" "/etc/systemd/system/\$SERVICE_NAME.service"
+    systemctl daemon-reload
 fi
 
 [ -d "\$REPO_DIR/.git" ] || git clone "\$REPO_URL" "\$REPO_DIR"
 cd "\$REPO_DIR"
 git pull origin "\$BRANCH"
+
+if [ ! -x "\$REPO_DIR/.venv/bin/python" ]; then
+    python3 -m venv "\$REPO_DIR/.venv"
+    "\$REPO_DIR/.venv/bin/pip" install --upgrade pip setuptools wheel
+    "\$REPO_DIR/.venv/bin/pip" install -r "\$REPO_DIR/requirements.txt"
+fi
 
 mkdir -p "\$DATA_DIR"
 chown -R "\$BOT_USER":"\$BOT_USER" "\$DATA_DIR"
