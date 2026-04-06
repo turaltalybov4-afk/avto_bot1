@@ -1,11 +1,11 @@
 # Default client profile for the bot.
 # Copy this file to a new file (for example, alfa_service.py) and change values.
 
-TOKEN = "8610850100:AAG74HVtAKWbKvajSwIxWZhJrDGjZw7_Nq0"
+TOKEN = "8610850100:AAGdjqwhssE3R-YEQpb6nmudqzX-2pZsdds"
 MANAGERS = [6271000700]
-DATABASE_FILE = "auto.db"
+DATABASE_FILE = "/var/lib/auto_bot/auto_default.db"
 
-COMPANY_NAME = "АвтоССССервис"
+COMPANY_NAME = "АВТОсервис"
 TAGLINE = "Быстрый и честный сервис без лишних работ"
 BUSINESS_HOURS = "Пн-Сб 09:00-21:00"
 BUSINESS_FEATURES = [

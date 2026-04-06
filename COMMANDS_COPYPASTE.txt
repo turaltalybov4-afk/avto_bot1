@@ -157,6 +157,16 @@ powershell -ExecutionPolicy Bypass -File .\deploy_autobot2.ps1
 
 После команды 38 вставь только токен 2-го бота в запросе "Paste TOKEN for autobot2".
 
+39) УНИВЕРСАЛЬНЫЙ one-click для любого нового бота (3,4,5,6...)
+powershell -ExecutionPolicy Bypass -File .\deploy_new_bot.ps1
+
+После команды 39 скрипт сам спросит:
+- номер бота (1,2,3...)
+- профиль (имя файла в profiles без .py)
+- manager id
+- токен
+И развернет/обновит нужный сервис на VPS.
+
 ОТДЕЛЬНАЯ БАЗА ДЛЯ НОВОГО КЛИЕНТА (ПРОСТО)
 1. В профиле клиента укажи DATABASE_FILE, например:
 	DATABASE_FILE = "auto_zhes.db"

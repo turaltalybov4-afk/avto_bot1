@@ -87,19 +87,15 @@ SKIP_BOOTSTRAP='$rSkipBootstrap'
 
 [ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin "\$BRANCH" || git clone "\$REPO_URL" /tmp/setup_repo
 
-if [ "\$SKIP_BOOTSTRAP" != "1" ] && [ ! -f "/etc/systemd/system/\$SERVICE_NAME.service" ]; then
-    if ! id "\$BOT_USER" > /dev/null 2>&1; then
-        useradd --system --no-create-home --shell /usr/sbin/nologin "\$BOT_USER"
-    fi
-
+[ "\$SKIP_BOOTSTRAP" = "1" ] || [ -f "/etc/systemd/system/\$SERVICE_NAME.service" ] || {
+    id "\$BOT_USER" > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "\$BOT_USER"
     mkdir -p "\$REPO_DIR" "\$DATA_DIR"
-
     cp /tmp/setup_repo/deploy/autobot.service "/etc/systemd/system/\$SERVICE_NAME.service"
     sed -i "s|SETUP_BOT_DIR|\$REPO_DIR|g" "/etc/systemd/system/\$SERVICE_NAME.service"
     sed -i "s|SETUP_BOT_USER|\$BOT_USER|g" "/etc/systemd/system/\$SERVICE_NAME.service"
     sed -i "s|SETUP_BOT_ENV_FILE|\$ENV_FILE|g" "/etc/systemd/system/\$SERVICE_NAME.service"
     systemctl daemon-reload
-fi
+}
 
 [ -d "\$REPO_DIR/.git" ] || git clone "\$REPO_URL" "\$REPO_DIR"
 cd "\$REPO_DIR"
