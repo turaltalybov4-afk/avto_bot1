@@ -85,48 +85,48 @@ REPO_URL='$rRepoUrl'
 BRANCH='$rBranch'
 SKIP_BOOTSTRAP='$rSkipBootstrap'
 
-[ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin "\$BRANCH" || git clone "\$REPO_URL" /tmp/setup_repo
+[ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin "`$BRANCH" || git clone "`$REPO_URL" /tmp/setup_repo
 
-[ "\$SKIP_BOOTSTRAP" = "1" ] || [ -f "/etc/systemd/system/\$SERVICE_NAME.service" ] || {
-    id "\$BOT_USER" > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "\$BOT_USER"
-    mkdir -p "\$REPO_DIR" "\$DATA_DIR"
-    cp /tmp/setup_repo/deploy/autobot.service "/etc/systemd/system/\$SERVICE_NAME.service"
-    sed -i "s|SETUP_BOT_DIR|\$REPO_DIR|g" "/etc/systemd/system/\$SERVICE_NAME.service"
-    sed -i "s|SETUP_BOT_USER|\$BOT_USER|g" "/etc/systemd/system/\$SERVICE_NAME.service"
-    sed -i "s|SETUP_BOT_ENV_FILE|\$ENV_FILE|g" "/etc/systemd/system/\$SERVICE_NAME.service"
+[ "`$SKIP_BOOTSTRAP" = "1" ] || [ -f "/etc/systemd/system/`$SERVICE_NAME.service" ] || {
+    id "`$BOT_USER" > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "`$BOT_USER"
+    mkdir -p "`$REPO_DIR" "`$DATA_DIR"
+    cp /tmp/setup_repo/deploy/autobot.service "/etc/systemd/system/`$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_DIR|`$REPO_DIR|g" "/etc/systemd/system/`$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_USER|`$BOT_USER|g" "/etc/systemd/system/`$SERVICE_NAME.service"
+    sed -i "s|SETUP_BOT_ENV_FILE|`$ENV_FILE|g" "/etc/systemd/system/`$SERVICE_NAME.service"
     systemctl daemon-reload
 }
 
-[ -d "\$REPO_DIR/.git" ] || git clone "\$REPO_URL" "\$REPO_DIR"
-cd "\$REPO_DIR"
-git pull origin "\$BRANCH"
+[ -d "`$REPO_DIR/.git" ] || git clone "`$REPO_URL" "`$REPO_DIR"
+cd "`$REPO_DIR"
+git pull origin "`$BRANCH"
 
-if [ ! -x "\$REPO_DIR/.venv/bin/python" ]; then
-    python3 -m venv "\$REPO_DIR/.venv"
-    "\$REPO_DIR/.venv/bin/pip" install --upgrade pip setuptools wheel
-    "\$REPO_DIR/.venv/bin/pip" install -r "\$REPO_DIR/requirements.txt"
+if [ ! -x "`$REPO_DIR/.venv/bin/python" ]; then
+    python3 -m venv "`$REPO_DIR/.venv"
+    "`$REPO_DIR/.venv/bin/pip" install --upgrade pip setuptools wheel
+    "`$REPO_DIR/.venv/bin/pip" install -r "`$REPO_DIR/requirements.txt"
 fi
 
-mkdir -p "\$DATA_DIR"
-chown -R "\$BOT_USER":"\$BOT_USER" "\$DATA_DIR"
-chmod 750 "\$DATA_DIR"
+mkdir -p "`$DATA_DIR"
+chown -R "`$BOT_USER":"`$BOT_USER" "`$DATA_DIR"
+chmod 750 "`$DATA_DIR"
 
-cat > "\$ENV_FILE" <<EOF
-BOT_TOKEN=\$BOT_TOKEN
-AUTOBOT_PROFILE=\$PROFILE
-AUTOBOT_MANAGERS=\$MANAGERS
-AUTOBOT_DATABASE_FILE=\$DB_FILE
+cat > "`$ENV_FILE" <<EOF
+BOT_TOKEN=`$BOT_TOKEN
+AUTOBOT_PROFILE=`$PROFILE
+AUTOBOT_MANAGERS=`$MANAGERS
+AUTOBOT_DATABASE_FILE=`$DB_FILE
 EOF
 
-chmod 600 "\$ENV_FILE"
+chmod 600 "`$ENV_FILE"
 systemctl daemon-reload
-systemctl enable "\$SERVICE_NAME"
-systemctl restart "\$SERVICE_NAME"
+systemctl enable "`$SERVICE_NAME"
+systemctl restart "`$SERVICE_NAME"
 
-systemctl is-enabled "\$SERVICE_NAME"
-systemctl is-active "\$SERVICE_NAME"
-systemctl status "\$SERVICE_NAME" --no-pager
-journalctl -u "\$SERVICE_NAME" -n 30 --no-pager
+systemctl is-enabled "`$SERVICE_NAME"
+systemctl is-active "`$SERVICE_NAME"
+systemctl status "`$SERVICE_NAME" --no-pager
+journalctl -u "`$SERVICE_NAME" -n 30 --no-pager
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""

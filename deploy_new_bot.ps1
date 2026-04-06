@@ -82,4 +82,4 @@ powershell -ExecutionPolicy Bypass -File ".\one_click_deploy.ps1" `
 
 Write-Host "" 
 Write-Host "Done. Quick check:" -ForegroundColor Green
-Write-Host "ssh root@$ServerIp \"systemctl is-active $serviceName; systemctl is-enabled $serviceName; systemctl status $serviceName --no-pager\""
+Write-Host ('ssh root@{0} "systemctl is-active {1}; systemctl is-enabled {1}; systemctl status {1} --no-pager"' -f $ServerIp, $serviceName)
