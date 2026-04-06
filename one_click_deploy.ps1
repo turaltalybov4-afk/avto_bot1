@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ManagerIds,
 
-    [string]$Profile = "default",
+    [string]$ClientProfile = "default",
     [string]$SshUser = "root",
     [string]$RepoDir = "/opt/auto_bot",
     [string]$ServiceName = "autobot",
@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
-function Escape-Sq([string]$v) {
+function ConvertTo-SqEscaped([string]$v) {
     return $v.Replace("'", "'\''")
 }
 
@@ -38,8 +38,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "No new commit created (nothing to commit or commit already exists)." -ForegroundColor Yellow
 }
 & git push origin $Branch
+if ($LASTEXITCODE -ne 0) {
+    throw "git push failed with exit code $LASTEXITCODE"
+}
 
-$dbFile = "{0}/auto_{1}.db" -f $DataDir.TrimEnd('/'), $Profile
+$dbFile = "{0}/auto_{1}.db" -f $DataDir.TrimEnd('/'), $ClientProfile
 $repoUrlValue = if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
         & git config --get remote.origin.url
 } else {
@@ -55,18 +58,18 @@ $bootstrapFlag = if ($SkipBootstrap) { "0" } else { "1" }
 $remoteScript = @"
 set -e
 
-REPO_DIR='$(Escape-Sq $RepoDir)'
-SERVICE_NAME='$(Escape-Sq $ServiceName)'
-BOT_USER='$(Escape-Sq $BotUser)'
-DATA_DIR='$(Escape-Sq $DataDir)'
-ENV_FILE='$(Escape-Sq $EnvFile)'
-PROFILE='$(Escape-Sq $Profile)'
-BOT_TOKEN='$(Escape-Sq $BotToken)'
-MANAGERS='$(Escape-Sq $ManagerIds)'
-DB_FILE='$(Escape-Sq $dbFile)'
-REPO_URL='$(Escape-Sq $repoUrlValue)'
-BRANCH='$(Escape-Sq $Branch)'
-DO_BOOTSTRAP='$(Escape-Sq $bootstrapFlag)'
+REPO_DIR='$(ConvertTo-SqEscaped $RepoDir)'
+SERVICE_NAME='$(ConvertTo-SqEscaped $ServiceName)'
+BOT_USER='$(ConvertTo-SqEscaped $BotUser)'
+DATA_DIR='$(ConvertTo-SqEscaped $DataDir)'
+ENV_FILE='$(ConvertTo-SqEscaped $EnvFile)'
+PROFILE='$(ConvertTo-SqEscaped $ClientProfile)'
+BOT_TOKEN='$(ConvertTo-SqEscaped $BotToken)'
+MANAGERS='$(ConvertTo-SqEscaped $ManagerIds)'
+DB_FILE='$(ConvertTo-SqEscaped $dbFile)'
+REPO_URL='$(ConvertTo-SqEscaped $repoUrlValue)'
+BRANCH='$(ConvertTo-SqEscaped $Branch)'
+DO_BOOTSTRAP='$(ConvertTo-SqEscaped $bootstrapFlag)'
 
 if [ ! -d "/tmp/setup_repo/.git" ]; then
     git clone "\$REPO_URL" /tmp/setup_repo
@@ -74,8 +77,10 @@ else
     git -C /tmp/setup_repo pull origin "\$BRANCH"
 fi
 
-if [ "\$DO_BOOTSTRAP" = "1" ] && [ ! -f "/etc/systemd/system/\$SERVICE_NAME.service" ]; then
-    printf "%s\n" "\$REPO_URL" | BOT_USER="\$BOT_USER" BOT_DIR="\$REPO_DIR" BOT_DATA_DIR="\$DATA_DIR" BOT_ENV_FILE="\$ENV_FILE" SERVICE_NAME="\$SERVICE_NAME" bash /tmp/setup_repo/deploy/setup.sh
+if [ "\$DO_BOOTSTRAP" = "1" ]; then
+    if [ ! -f "/etc/systemd/system/\$SERVICE_NAME.service" ]; then
+        printf "%s\n" "\$REPO_URL" | BOT_USER="\$BOT_USER" BOT_DIR="\$REPO_DIR" BOT_DATA_DIR="\$DATA_DIR" BOT_ENV_FILE="\$ENV_FILE" SERVICE_NAME="\$SERVICE_NAME" bash /tmp/setup_repo/deploy/setup.sh
+    fi
 fi
 
 if [ ! -d "\$REPO_DIR/.git" ]; then
@@ -114,6 +119,9 @@ $remoteScript = $remoteScript -replace "`r`n", "`n"
 $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
 $remoteCommand = "echo $encoded | base64 -d | bash"
 & ssh $target $remoteCommand
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote deploy failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "[3/4] Done." -ForegroundColor Green
 Write-Host "[4/4] If Telegram still does not respond, test /start and share last 20 log lines." -ForegroundColor Yellow

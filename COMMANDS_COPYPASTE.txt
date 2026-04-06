@@ -134,7 +134,7 @@ journalctl -u autobot -n 60 --no-pager
 ================ ONE-CLICK ДЕПЛОЙ (САМЫЙ ПРОСТОЙ ВАРИАНТ) ================
 
 33) 1 команда на ПК: пуш + деплой + перезапуск + проверка
-powershell -ExecutionPolicy Bypass -File .\one_click_deploy.ps1 -ServerIp 146.103.42.126 -BotToken "ВСТАВЬ_ТОКЕН" -ManagerIds "6271000700" -Profile "default" -RepoUrl "https://github.com/ТВОЙ_ЛОГИН/avto_bot1.git"
+powershell -ExecutionPolicy Bypass -File .\one_click_deploy.ps1 -ServerIp 146.103.42.126 -BotToken "ВСТАВЬ_ТОКЕН" -ManagerIds "6271000700" -ClientProfile "default" -RepoUrl "https://github.com/ТВОЙ_ЛОГИН/avto_bot1.git"
 
 34) Проверка результата после команды 33 (на VPS)
 systemctl is-active autobot
@@ -147,7 +147,7 @@ type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@146.103.42.126 "mkdir -p ~/
 После шага 35 команда 33 становится практически в 1 клик без ввода пароля.
 
 36) ONE-CLICK для 2-го бота (autobot2) на том же VPS
-powershell -ExecutionPolicy Bypass -File .\one_click_deploy.ps1 -ServerIp 146.103.42.126 -ServiceName autobot2 -BotUser botuser2 -RepoDir /opt/auto_bot2 -DataDir /var/lib/auto_bot2 -EnvFile /etc/auto_bot2.env -BotToken "ВСТАВЬ_ТОКЕН_2" -ManagerIds "6271000700" -Profile "turbo_service" -RepoUrl "https://github.com/ТВОЙ_ЛОГИН/avto_bot1.git"
+powershell -ExecutionPolicy Bypass -File .\one_click_deploy.ps1 -ServerIp 146.103.42.126 -ServiceName autobot2 -BotUser botuser2 -RepoDir /opt/auto_bot2 -DataDir /var/lib/auto_bot2 -EnvFile /etc/auto_bot2.env -BotToken "ВСТАВЬ_ТОКЕН_2" -ManagerIds "6271000700" -ClientProfile "turbo_service" -RepoUrl "https://github.com/ТВОЙ_ЛОГИН/avto_bot1.git"
 
 37) Быстрая проверка 2-го бота
 ssh root@146.103.42.126 "systemctl is-active autobot2; systemctl is-enabled autobot2; systemctl status autobot2 --no-pager"
