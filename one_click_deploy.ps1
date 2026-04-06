@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ManagerIds,
 
-    [string]$ClientProfile = "default",
+    [string]$ClientKey = "default",
     [string]$SshUser = "root",
     [string]$RepoDir = "/opt/auto_bot",
     [string]$ServiceName = "autobot",
@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
-function ConvertTo-SqEscaped([string]$v) {
+function ConvertTo-SingleQuoteEscaped([string]$v) {
     return $v.Replace("'", "'\''")
 }
 
@@ -42,7 +42,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "git push failed with exit code $LASTEXITCODE"
 }
 
-$dbFile = "{0}/auto_{1}.db" -f $DataDir.TrimEnd('/'), $ClientProfile
+$dbFile = "{0}/auto_{1}.db" -f $DataDir.TrimEnd('/'), $ClientKey
 $repoUrlValue = if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
         & git config --get remote.origin.url
 } else {
@@ -58,18 +58,18 @@ $bootstrapFlag = if ($SkipBootstrap) { "0" } else { "1" }
 $remoteScript = @"
 set -e
 
-REPO_DIR='$(ConvertTo-SqEscaped $RepoDir)'
-SERVICE_NAME='$(ConvertTo-SqEscaped $ServiceName)'
-BOT_USER='$(ConvertTo-SqEscaped $BotUser)'
-DATA_DIR='$(ConvertTo-SqEscaped $DataDir)'
-ENV_FILE='$(ConvertTo-SqEscaped $EnvFile)'
-PROFILE='$(ConvertTo-SqEscaped $ClientProfile)'
-BOT_TOKEN='$(ConvertTo-SqEscaped $BotToken)'
-MANAGERS='$(ConvertTo-SqEscaped $ManagerIds)'
-DB_FILE='$(ConvertTo-SqEscaped $dbFile)'
-REPO_URL='$(ConvertTo-SqEscaped $repoUrlValue)'
-BRANCH='$(ConvertTo-SqEscaped $Branch)'
-DO_BOOTSTRAP='$(ConvertTo-SqEscaped $bootstrapFlag)'
+REPO_DIR='$(ConvertTo-SingleQuoteEscaped $RepoDir)'
+SERVICE_NAME='$(ConvertTo-SingleQuoteEscaped $ServiceName)'
+BOT_USER='$(ConvertTo-SingleQuoteEscaped $BotUser)'
+DATA_DIR='$(ConvertTo-SingleQuoteEscaped $DataDir)'
+ENV_FILE='$(ConvertTo-SingleQuoteEscaped $EnvFile)'
+PROFILE='$(ConvertTo-SingleQuoteEscaped $ClientKey)'
+BOT_TOKEN='$(ConvertTo-SingleQuoteEscaped $BotToken)'
+MANAGERS='$(ConvertTo-SingleQuoteEscaped $ManagerIds)'
+DB_FILE='$(ConvertTo-SingleQuoteEscaped $dbFile)'
+REPO_URL='$(ConvertTo-SingleQuoteEscaped $repoUrlValue)'
+BRANCH='$(ConvertTo-SingleQuoteEscaped $Branch)'
+DO_BOOTSTRAP='$(ConvertTo-SingleQuoteEscaped $bootstrapFlag)'
 
 if [ ! -d "/tmp/setup_repo/.git" ]; then
     git clone "\$REPO_URL" /tmp/setup_repo
@@ -115,10 +115,8 @@ journalctl -u "\$SERVICE_NAME" -n 30 --no-pager
 
 Write-Host "[2/4] Deploy to VPS..." -ForegroundColor Green
 $target = "$SshUser@$ServerIp"
-$remoteScript = $remoteScript -replace "`r`n", "`n"
-$encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
-$remoteCommand = "echo $encoded | base64 -d | bash"
-& ssh $target $remoteCommand
+$remoteScript = $remoteScript -replace "`r", ""
+$remoteScript | ssh $target "bash -se"
 if ($LASTEXITCODE -ne 0) {
     throw "Remote deploy failed with exit code $LASTEXITCODE"
 }

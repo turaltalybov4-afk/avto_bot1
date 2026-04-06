@@ -1,7 +1,7 @@
 param(
     [string]$ServerIp = "146.103.42.126",
     [string]$ManagerIds = "8673882143",
-    [string]$ClientProfile = "turbo_service",
+    [string]$ClientKey = "turbo_service",
     [string]$RepoUrl = "https://github.com/turaltalybov4-afk/avto_bot1.git"
 )
 
@@ -22,5 +22,5 @@ powershell -ExecutionPolicy Bypass -File ".\one_click_deploy.ps1" `
     -EnvFile "/etc/auto_bot2.env" `
     -BotToken $token `
     -ManagerIds $ManagerIds `
-    -ClientProfile $ClientProfile `
+    -ClientKey $ClientKey `
     -RepoUrl $RepoUrl
