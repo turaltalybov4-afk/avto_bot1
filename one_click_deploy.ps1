@@ -126,7 +126,7 @@ systemctl restart "`$SERVICE_NAME"
 systemctl is-enabled "`$SERVICE_NAME"
 systemctl is-active "`$SERVICE_NAME"
 systemctl status "`$SERVICE_NAME" --no-pager
-journalctl -u "`$SERVICE_NAME" -n 30 --no-pager
+journalctl -u "`$SERVICE_NAME" -n 30 --no-pager || true
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""
