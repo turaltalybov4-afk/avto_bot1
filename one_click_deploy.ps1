@@ -53,72 +53,47 @@ if ([string]::IsNullOrWhiteSpace($repoUrlValue)) {
         throw "RepoUrl is empty and remote.origin.url was not found. Pass -RepoUrl explicitly."
 }
 
-$bootstrapFlag = if ($SkipBootstrap) { "0" } else { "1" }
-
-$remoteScript = @"
-set -e
-
-REPO_DIR='$(ConvertTo-SingleQuoteEscaped $RepoDir)'
-SERVICE_NAME='$(ConvertTo-SingleQuoteEscaped $ServiceName)'
-BOT_USER='$(ConvertTo-SingleQuoteEscaped $BotUser)'
-DATA_DIR='$(ConvertTo-SingleQuoteEscaped $DataDir)'
-ENV_FILE='$(ConvertTo-SingleQuoteEscaped $EnvFile)'
-PROFILE='$(ConvertTo-SingleQuoteEscaped $ClientKey)'
-BOT_TOKEN='$(ConvertTo-SingleQuoteEscaped $BotToken)'
-MANAGERS='$(ConvertTo-SingleQuoteEscaped $ManagerIds)'
-DB_FILE='$(ConvertTo-SingleQuoteEscaped $dbFile)'
-REPO_URL='$(ConvertTo-SingleQuoteEscaped $repoUrlValue)'
-BRANCH='$(ConvertTo-SingleQuoteEscaped $Branch)'
-DO_BOOTSTRAP='$(ConvertTo-SingleQuoteEscaped $bootstrapFlag)'
-
-if [ ! -d "/tmp/setup_repo/.git" ]; then
-    git clone "\$REPO_URL" /tmp/setup_repo
-else
-    git -C /tmp/setup_repo pull origin "\$BRANCH"
-fi
-
-if [ "\$DO_BOOTSTRAP" = "1" ]; then
-    if [ ! -f "/etc/systemd/system/\$SERVICE_NAME.service" ]; then
-        printf "%s\n" "\$REPO_URL" | BOT_USER="\$BOT_USER" BOT_DIR="\$REPO_DIR" BOT_DATA_DIR="\$DATA_DIR" BOT_ENV_FILE="\$ENV_FILE" SERVICE_NAME="\$SERVICE_NAME" bash /tmp/setup_repo/deploy/setup.sh
-    fi
-fi
-
-if [ ! -d "\$REPO_DIR/.git" ]; then
-  git clone "\$REPO_URL" "\$REPO_DIR"
-fi
-
-cd "\$REPO_DIR"
-git pull origin "\$BRANCH"
-
-mkdir -p "\$DATA_DIR"
-chown -R "\$BOT_USER":"\$BOT_USER" "\$DATA_DIR"
-chmod 750 "\$DATA_DIR"
-
-cat > "\$ENV_FILE" <<EOF
-BOT_TOKEN=\$BOT_TOKEN
-AUTOBOT_PROFILE=\$PROFILE
-AUTOBOT_MANAGERS=\$MANAGERS
-AUTOBOT_DATABASE_FILE=\$DB_FILE
-EOF
-
-chmod 600 "\$ENV_FILE"
-systemctl daemon-reload
-systemctl enable "\$SERVICE_NAME"
-systemctl restart "\$SERVICE_NAME"
-
-echo "--- RESULT ---"
-systemctl is-enabled "\$SERVICE_NAME"
-systemctl is-active "\$SERVICE_NAME"
-systemctl status "\$SERVICE_NAME" --no-pager
-journalctl -u "\$SERVICE_NAME" -n 30 --no-pager
-"@
-
 Write-Host "[2/4] Deploy to VPS..." -ForegroundColor Green
 $target = "$SshUser@$ServerIp"
-$remoteScript = $remoteScript -replace "`r", ""
-$remoteScript | ssh $target "bash -se"
+
+$rRepoDir = ConvertTo-SingleQuoteEscaped $RepoDir
+$rServiceName = ConvertTo-SingleQuoteEscaped $ServiceName
+$rBotUser = ConvertTo-SingleQuoteEscaped $BotUser
+$rDataDir = ConvertTo-SingleQuoteEscaped $DataDir
+$rEnvFile = ConvertTo-SingleQuoteEscaped $EnvFile
+$rClientKey = ConvertTo-SingleQuoteEscaped $ClientKey
+$rBotToken = ConvertTo-SingleQuoteEscaped $BotToken
+$rManagerIds = ConvertTo-SingleQuoteEscaped $ManagerIds
+$rDbFile = ConvertTo-SingleQuoteEscaped $dbFile
+$rRepoUrl = ConvertTo-SingleQuoteEscaped $repoUrlValue
+$rBranch = ConvertTo-SingleQuoteEscaped $Branch
+
+function Invoke-RemoteStrict([string]$cmd) {
+    & ssh $target $cmd
+    if ($LASTEXITCODE -ne 0) {
+        throw "Remote deploy failed with exit code $LASTEXITCODE"
+    }
+}
+
+Invoke-RemoteStrict "[ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin '$rBranch' || git clone '$rRepoUrl' /tmp/setup_repo"
+
+$serviceExistsCmd = "test -f '/etc/systemd/system/$rServiceName.service'"
+& ssh $target $serviceExistsCmd
+$serviceExists = ($LASTEXITCODE -eq 0)
+
+if (-not $SkipBootstrap -and -not $serviceExists) {
+    Invoke-RemoteStrict "printf '%s\n' '$rRepoUrl' | BOT_USER='$rBotUser' BOT_DIR='$rRepoDir' BOT_DATA_DIR='$rDataDir' BOT_ENV_FILE='$rEnvFile' SERVICE_NAME='$rServiceName' bash /tmp/setup_repo/deploy/setup.sh"
+}
+
+Invoke-RemoteStrict "[ -d '$rRepoDir/.git' ] || git clone '$rRepoUrl' '$rRepoDir'"
+Invoke-RemoteStrict "cd '$rRepoDir' && git pull origin '$rBranch'"
+Invoke-RemoteStrict "mkdir -p '$rDataDir' && chown -R '$rBotUser':'$rBotUser' '$rDataDir' && chmod 750 '$rDataDir'"
+Invoke-RemoteStrict "printf '%s\n' 'BOT_TOKEN=$rBotToken' 'AUTOBOT_PROFILE=$rClientKey' 'AUTOBOT_MANAGERS=$rManagerIds' 'AUTOBOT_DATABASE_FILE=$rDbFile' > '$rEnvFile'"
+Invoke-RemoteStrict "chmod 600 '$rEnvFile' && systemctl daemon-reload && systemctl enable '$rServiceName' && systemctl restart '$rServiceName'"
+
+& ssh $target "systemctl is-enabled '$rServiceName'; systemctl is-active '$rServiceName'; systemctl status '$rServiceName' --no-pager; journalctl -u '$rServiceName' -n 30 --no-pager"
 if ($LASTEXITCODE -ne 0) {
-    throw "Remote deploy failed with exit code $LASTEXITCODE"
+    throw "Remote status check failed with exit code $LASTEXITCODE"
 }
 
 Write-Host "[3/4] Done." -ForegroundColor Green
