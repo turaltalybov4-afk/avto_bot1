@@ -7,3 +7,4 @@ profiles/__pycache__/
 *.db
 .env
 .env.local
+deploy_bots.json

@@ -1,9 +1,8 @@
 import asyncio
 import datetime
-import random
-import re
 from html import escape
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -27,8 +26,24 @@ ACTIVE_BOOKING_STATUSES = ("booked", "confirmed_by_client", "pending", "approved
 INACTIVE_BOOKING_STATUSES = ("cancelled", "rejected", "reschedule_requested")
 
 
+try:
+    BOT_TZ = ZoneInfo(config.TIMEZONE)
+except ZoneInfoNotFoundError:
+    BOT_TZ = None
+
+
 def format_money(amount: int) -> str:
     return f"{int(amount):,}".replace(",", " ")
+
+
+def get_now_local() -> datetime.datetime:
+    if BOT_TZ is not None:
+        return datetime.datetime.now(BOT_TZ)
+    return datetime.datetime.now()
+
+
+def get_today_local() -> datetime.date:
+    return get_now_local().date()
 
 
 def get_service_by_name(service_name: str):
@@ -47,72 +62,6 @@ def get_upsell_by_name(service_name: str, upsell_name: str):
         if upsell["name"] == upsell_name:
             return upsell
     return None
-
-
-def normalize_text(text: str) -> str:
-    text = text.lower().replace("ё", "е")
-    text = re.sub(r"[^\w\s]", " ", text)
-    return " ".join(text.split())
-
-
-def has_any_keyword(normalized_text: str, keywords) -> bool:
-    return any(normalize_text(keyword) in normalized_text for keyword in keywords if keyword)
-
-
-def build_service_price_answer(service: dict) -> str:
-    return (
-        f"{service['name']} стоит {format_money(service['price'])}₽. "
-        "Если хотите, сразу оформлю заявку и подберу удобное время доставки/встречи."
-    )
-
-
-def get_faq_answer(text: str) -> Optional[str]:
-    normalized = normalize_text(text)
-
-    for item in config.FAQ_ITEMS:
-        if not has_any_keyword(normalized, item.get("triggers", [])):
-            continue
-
-        answers = item.get("answers") or []
-        if answers:
-            return random.choice(answers)
-
-        answer = item.get("answer")
-        if answer:
-            return answer
-
-    price_keywords = ["цена", "стоим", "сколько", "почем"]
-    kg_keywords = ["кг", "килограмм", "вес", "мешок"]
-
-    for service in config.SERVICES:
-        aliases = service.get("aliases", [])
-        labels = [service["name"], *aliases]
-        if not has_any_keyword(normalized, labels):
-            continue
-
-        if has_any_keyword(normalized, price_keywords):
-            return build_service_price_answer(service)
-
-        if has_any_keyword(normalized, kg_keywords):
-            return (
-                f"По товару '{service['name']}' отвечу по весу точно после заявки. "
-                "Напишите, какой объем нужен, и менеджер сразу подтвердит остатки и фасовку."
-            )
-
-    return None
-
-
-def should_start_lead_flow(text: str) -> bool:
-    normalized = normalize_text(text)
-    return has_any_keyword(normalized, config.ORDER_START_KEYWORDS)
-
-
-def normalize_lead_comment(text: str) -> str:
-    normalized = normalize_text(text)
-    skip_words = {normalize_text(word) for word in config.LEAD_SKIP_WORDS}
-    if normalized in skip_words:
-        return ""
-    return text
 
 
 def get_meta(key: str):
@@ -143,7 +92,7 @@ def touch_booking(user_id: int, user=None):
         return
 
     draft = user_data_temp[user_id]
-    draft["last_activity"] = datetime.datetime.now().isoformat()
+    draft["last_activity"] = get_now_local().isoformat()
     draft["inactivity_reminder_sent"] = False
 
     if user is not None:
@@ -242,7 +191,7 @@ def format_date_str_ru(date_str: str, include_year: bool = False) -> str:
 
 
 def build_date_keyboard() -> InlineKeyboardMarkup:
-    today = datetime.date.today()
+    today = get_today_local()
     date_buttons = [
         InlineKeyboardButton(
             format_date_ru(today + datetime.timedelta(days=i)),
@@ -271,12 +220,24 @@ def _slot_is_in_past(date_str: str, slot: str) -> bool:
         slot_dt = datetime.datetime.strptime(f"{date_str} {slot}", "%Y-%m-%d %H:%M")
     except ValueError:
         return True
-    return slot_dt <= datetime.datetime.now()
+
+    if BOT_TZ is not None:
+        slot_dt = slot_dt.replace(tzinfo=BOT_TZ)
+
+    return slot_dt <= get_now_local()
 
 
 def get_available_slots(date: str):
     busy_slots = get_busy_slots(date)
     return [slot for slot in config.TIME_SLOTS if slot not in busy_slots and not _slot_is_in_past(date, slot)]
+
+
+def get_slot_unavailability_reason(date: str, slot: str) -> str:
+    if _slot_is_in_past(date, slot):
+        return "past"
+    if slot in get_busy_slots(date):
+        return "busy"
+    return "unknown"
 
 
 def is_time_available(date: str, time: str) -> bool:
@@ -447,59 +408,6 @@ async def forward_client_message_to_managers(
 
     for manager in config.MANAGERS:
         await context.bot.send_message(manager, text, parse_mode="HTML")
-
-
-def build_manager_lead_message(user, lead: dict, lead_id: int) -> str:
-    client_name = escape(user.first_name or "Клиент")
-    client_link = f"<a href=\"tg://user?id={user.id}\">{client_name}</a>"
-    username = f"@{escape(user.username)}" if user.username else "нет"
-    source_text = escape(lead.get("source_text", ""))
-    quantity = escape(lead.get("quantity", ""))
-    preferred_date = escape(lead.get("preferred_date", ""))
-    contact = escape(lead.get("contact", ""))
-    comment = escape(lead.get("comment", "")) or "нет"
-
-    return (
-        f"{config.MANAGER_LEAD_TITLE}\n\n"
-        f"ID заявки: #{lead_id}\n"
-        f"Клиент: {client_link}\n"
-        f"ID клиента: {user.id}\n"
-        f"Username: {username}\n"
-        f"Первое сообщение: {source_text or 'нет'}\n"
-        f"Объем/кол-во: {quantity or 'не указано'}\n"
-        f"Когда удобно: {preferred_date or 'не указано'}\n"
-        f"Контакт: {contact or 'не указан'}\n"
-        f"Комментарий: {comment}"
-    )
-
-
-async def save_and_notify_lead(context: ContextTypes.DEFAULT_TYPE, user, lead: dict) -> None:
-    database.cursor.execute(
-        """
-        INSERT INTO leads (
-            user_id, client_name, username, request_text,
-            quantity, preferred_date, contact, comment, created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            user.id,
-            user.first_name or "Клиент",
-            user.username or "",
-            lead.get("source_text", ""),
-            lead.get("quantity", ""),
-            lead.get("preferred_date", ""),
-            lead.get("contact", ""),
-            lead.get("comment", ""),
-            datetime.datetime.now().isoformat(),
-        ),
-    )
-    lead_id = database.cursor.lastrowid
-    database.conn.commit()
-
-    manager_text = build_manager_lead_message(user, lead, lead_id)
-    for manager in config.MANAGERS:
-        await context.bot.send_message(manager, manager_text, parse_mode="HTML")
 
 
 def parse_booking_datetime(date: str, time: str):
@@ -775,7 +683,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         days = int(data.replace("date_", "", 1))
-        date = str(datetime.date.today() + datetime.timedelta(days=days))
+        date = str(get_today_local() + datetime.timedelta(days=days))
         user_data_temp[user_id]["date"] = date
         touch_booking(user_id, query.from_user)
 
@@ -802,14 +710,22 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         if not is_time_available(selected_date, time):
+            reason = get_slot_unavailability_reason(selected_date, time)
             markup, free_slots = build_time_keyboard(selected_date)
             if free_slots:
-                await query.answer("Это время уже занято, выберите другое.", show_alert=True)
-                await query.edit_message_text("Это время занято. Выберите свободное:", reply_markup=markup)
+                if reason == "past":
+                    await query.answer("Это время уже прошло, выберите другое.", show_alert=True)
+                    await query.edit_message_text("Это время уже прошло. Выберите свободное:", reply_markup=markup)
+                else:
+                    await query.answer("Это время уже занято, выберите другое.", show_alert=True)
+                    await query.edit_message_text("Это время занято. Выберите свободное:", reply_markup=markup)
             else:
-                await query.answer("На эту дату мест больше нет.", show_alert=True)
+                if reason == "past":
+                    await query.answer("На эту дату уже не осталось актуального времени.", show_alert=True)
+                else:
+                    await query.answer("На эту дату мест больше нет.", show_alert=True)
                 await query.edit_message_text(
-                    "На выбранную дату мест больше нет. Выберите другую дату:",
+                    "На выбранную дату свободного времени нет. Выберите другую дату:",
                     reply_markup=build_date_keyboard(),
                 )
             return
@@ -854,17 +770,30 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_date = user_data_temp[user_id].get("date")
         selected_time = user_data_temp[user_id].get("time")
         if selected_date and selected_time and not is_time_available(selected_date, selected_time):
+            reason = get_slot_unavailability_reason(selected_date, selected_time)
             markup, free_slots = build_time_keyboard(selected_date)
             if free_slots:
-                await query.edit_message_text(
-                    "Пока вы заполняли заявку, выбранное время заняли. Выберите другое:",
-                    reply_markup=markup,
-                )
+                if reason == "past":
+                    await query.edit_message_text(
+                        "Пока вы заполняли заявку, выбранное время уже прошло. Выберите другое:",
+                        reply_markup=markup,
+                    )
+                else:
+                    await query.edit_message_text(
+                        "Пока вы заполняли заявку, выбранное время заняли. Выберите другое:",
+                        reply_markup=markup,
+                    )
             else:
-                await query.edit_message_text(
-                    "Пока вы заполняли заявку, все слоты на эту дату заняли. Выберите другую дату:",
-                    reply_markup=build_date_keyboard(),
-                )
+                if reason == "past":
+                    await query.edit_message_text(
+                        "Пока вы заполняли заявку, на эту дату уже не осталось актуального времени. Выберите другую дату:",
+                        reply_markup=build_date_keyboard(),
+                    )
+                else:
+                    await query.edit_message_text(
+                        "Пока вы заполняли заявку, все слоты на эту дату заняли. Выберите другую дату:",
+                        reply_markup=build_date_keyboard(),
+                    )
             return
 
         await send_to_manager(context, user_id)
@@ -939,27 +868,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-async def try_handle_quick_text_flow(update: Update, text: str) -> bool:
-    user_id = update.effective_user.id
-
-    faq_answer = get_faq_answer(text)
-    if faq_answer:
-        await update.message.reply_text(faq_answer, reply_markup=build_main_menu_markup())
-        return True
-
-    if should_start_lead_flow(text):
-        user_state[user_id] = "lead_quantity"
-        user_data_temp[user_id] = {
-            "lead": {
-                "source_text": text,
-            }
-        }
-        await update.message.reply_text(config.LEAD_PROMPT_QUANTITY, reply_markup=build_prompt_markup())
-        return True
-
-    return False
-
-
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -969,8 +877,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         touch_booking(user_id, update.effective_user)
 
     if not state:
-        if await try_handle_quick_text_flow(update, text):
-            return
         await send_main_menu_message(update)
         return
 
@@ -981,34 +887,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Сообщение отправлено менеджеру. Скоро с вами свяжутся.",
             reply_markup=build_main_menu_markup(),
         )
-        return
-
-    if state == "lead_quantity":
-        user_data_temp.setdefault(user_id, {}).setdefault("lead", {})["quantity"] = text
-        user_state[user_id] = "lead_date"
-        await update.message.reply_text(config.LEAD_PROMPT_DATE, reply_markup=build_prompt_markup())
-        return
-
-    if state == "lead_date":
-        user_data_temp.setdefault(user_id, {}).setdefault("lead", {})["preferred_date"] = text
-        user_state[user_id] = "lead_contact"
-        await update.message.reply_text(config.LEAD_PROMPT_CONTACT, reply_markup=build_prompt_markup())
-        return
-
-    if state == "lead_contact":
-        user_data_temp.setdefault(user_id, {}).setdefault("lead", {})["contact"] = text
-        user_state[user_id] = "lead_comment"
-        await update.message.reply_text(config.LEAD_PROMPT_COMMENT, reply_markup=build_prompt_markup())
-        return
-
-    if state == "lead_comment":
-        lead = user_data_temp.setdefault(user_id, {}).setdefault("lead", {})
-        lead["comment"] = normalize_lead_comment(text)
-        await save_and_notify_lead(context, update.effective_user, lead)
-
-        user_state.pop(user_id, None)
-        user_data_temp.pop(user_id, None)
-        await update.message.reply_text(config.LEAD_SUCCESS_TEXT, reply_markup=build_main_menu_markup())
         return
 
     if state == "name":

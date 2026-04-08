@@ -1,0 +1,23 @@
+{
+  "defaultManagerIds": "6271000700",
+  "bots": [
+    {
+      "number": 1,
+      "profile": "default",
+      "token": "8610850100:AAGdjqwhssE3R-YEQpb6nmudqzX-2pZsdds",
+      "managerIds": "6271000700"
+    },
+    {
+      "number": 2,
+      "profile": "turbo_service",
+      "token": "8745064857:AAGkoPZ1Xzas2ZYvUvBxCgWYrYxoe7D9qek",
+      "managerIds": "6271000700"
+    },
+    {
+      "number": 3,
+      "profile": "zhes",
+      "token": "8743852204:AAE0fJxVnGgbsF-Ts_p704bYwuXJA2rcOmw",
+      "managerIds": "6271000700"
+    }
+  ]
+}
