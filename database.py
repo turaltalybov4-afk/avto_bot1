@@ -71,4 +71,20 @@ CREATE TABLE IF NOT EXISTS app_meta (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    client_name TEXT,
+    username TEXT,
+    request_text TEXT,
+    quantity TEXT,
+    preferred_date TEXT,
+    contact TEXT,
+    comment TEXT,
+    status TEXT DEFAULT 'new',
+    created_at TEXT
+)
+""")
+
 conn.commit()

@@ -52,11 +52,17 @@ def _normalize_services(raw_services):
     for service in raw_services:
         if not isinstance(service, dict):
             continue
+        raw_aliases = service.get("aliases", [])
+        if isinstance(raw_aliases, str):
+            aliases = [raw_aliases.strip()] if raw_aliases.strip() else []
+        else:
+            aliases = [str(item).strip() for item in raw_aliases if str(item).strip()]
         normalized.append(
             {
                 "name": str(service.get("name", "")).strip(),
                 "price": int(service.get("price", 0)),
                 "description": str(service.get("description", "")).strip(),
+                "aliases": aliases,
             }
         )
     return [s for s in normalized if s["name"]]
@@ -85,6 +91,37 @@ def _normalize_upsell(raw_upsell):
                     }
                 )
         normalized[str(service_name)] = [i for i in clean_items if i["name"]]
+
+    return normalized
+
+
+def _normalize_str_list(raw_value):
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        return [value] if value else []
+    if not isinstance(raw_value, list):
+        return []
+    return [str(item).strip() for item in raw_value if str(item).strip()]
+
+
+def _normalize_faq(raw_faq_items):
+    normalized = []
+    for item in raw_faq_items:
+        if not isinstance(item, dict):
+            continue
+
+        triggers = _normalize_str_list(item.get("triggers", []))
+        answer = str(item.get("answer", "")).strip()
+        answers = _normalize_str_list(item.get("answers", []))
+
+        if triggers and (answer or answers):
+            normalized.append(
+                {
+                    "triggers": triggers,
+                    "answer": answer,
+                    "answers": answers,
+                }
+            )
 
     return normalized
 
@@ -121,6 +158,7 @@ NO_UPSELL_TEXT = _pick(_profile, "NO_UPSELL_TEXT", "Для этой услуги
 
 SERVICES = _normalize_services(_pick(_profile, "SERVICES", []))
 UPSELL = _normalize_upsell(_pick(_profile, "UPSELL", {}))
+FAQ_ITEMS = _normalize_faq(_pick(_profile, "FAQ_ITEMS", []))
 
 BOOKING_DAYS_AHEAD = _env_int("AUTOBOT_BOOKING_DAYS_AHEAD", int(_pick(_profile, "BOOKING_DAYS_AHEAD", 5)))
 TIME_SLOTS = [str(x) for x in _pick(_profile, "TIME_SLOTS", ["10:00", "12:00", "14:00", "16:00"])]
@@ -186,6 +224,53 @@ CONTACT_MANAGER_PROMPT_TEXT = _pick(
     "CONTACT_MANAGER_PROMPT_TEXT",
     "✍️ Напишите сообщение для менеджера в чат. Мы сразу его передадим.",
 )
+
+ORDER_START_KEYWORDS = _normalize_str_list(
+    _pick(
+        _profile,
+        "ORDER_START_KEYWORDS",
+        [
+            "заказать",
+            "оформить",
+            "хочу взять",
+            "нужна доставка",
+            "оставить заявку",
+            "бронь",
+            "заявка",
+        ],
+    )
+)
+
+LEAD_PROMPT_QUANTITY = _pick(
+    _profile,
+    "LEAD_PROMPT_QUANTITY",
+    "Отлично, оформим заявку. Подскажите, пожалуйста, какой объем нужен?",
+)
+LEAD_PROMPT_DATE = _pick(
+    _profile,
+    "LEAD_PROMPT_DATE",
+    "Когда удобно: сегодня, завтра или другая дата?",
+)
+LEAD_PROMPT_CONTACT = _pick(
+    _profile,
+    "LEAD_PROMPT_CONTACT",
+    "Оставьте телефон или удобный способ связи.",
+)
+LEAD_PROMPT_COMMENT = _pick(
+    _profile,
+    "LEAD_PROMPT_COMMENT",
+    "Если есть комментарий (адрес, этаж, детали), напишите. Если нет, напишите 'нет'.",
+)
+LEAD_SUCCESS_TEXT = _pick(
+    _profile,
+    "LEAD_SUCCESS_TEXT",
+    "Готово, заявку приняли. Менеджер свяжется с вами для подтверждения времени.",
+)
+LEAD_SKIP_WORDS = _normalize_str_list(
+    _pick(_profile, "LEAD_SKIP_WORDS", ["нет", "не", "без комментария", "-"])
+)
+
+MANAGER_LEAD_TITLE = _pick(_profile, "MANAGER_LEAD_TITLE", "📥 Новая заявка из чата")
 
 MANAGER_CLIENT_MESSAGE_TEXT = _pick(
     _profile,

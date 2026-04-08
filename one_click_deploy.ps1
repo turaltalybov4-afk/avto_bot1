@@ -121,6 +121,8 @@ EOF
 chmod 600 "`$ENV_FILE"
 systemctl daemon-reload
 systemctl enable "`$SERVICE_NAME"
+systemctl kill --signal=SIGKILL "`$SERVICE_NAME" 2>/dev/null || true
+systemctl reset-failed "`$SERVICE_NAME" || true
 systemctl restart "`$SERVICE_NAME"
 
 systemctl is-enabled "`$SERVICE_NAME"
