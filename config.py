@@ -47,6 +47,15 @@ def _env_list_of_ints(name, default):
     return [int(item.strip()) for item in raw_value.split(",") if item.strip()]
 
 
+def _normalize_str_list(raw_value):
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        return [value] if value else []
+    if not isinstance(raw_value, list):
+        return []
+    return [str(item).strip() for item in raw_value if str(item).strip()]
+
+
 def _normalize_services(raw_services):
     normalized = []
     for service in raw_services:
@@ -198,4 +207,58 @@ MANAGER_CLIENT_MESSAGE_TEXT = _pick(
         "Username: {username}\n\n"
         "Сообщение:\n{message}"
     ),
+)
+
+UPSELL_SCENARIO_TITLE = _pick(
+    _profile,
+    "UPSELL_SCENARIO_TITLE",
+    "🎯 Рекомендуем к этой записи:",
+)
+UPSELL_SCENARIO_NOTE = _pick(
+    _profile,
+    "UPSELL_SCENARIO_NOTE",
+    "Можно добавить в 1 клик. Это помогает снизить риск повторного визита в ближайшие недели.",
+)
+UPSELL_PACKAGE_BUTTON_TEXT = _pick(
+    _profile,
+    "UPSELL_PACKAGE_BUTTON_TEXT",
+    "✨ Добавить рекомендованные",
+)
+
+REVIEW_REQUEST_DELAY_HOURS = _env_int(
+    "AUTOBOT_REVIEW_REQUEST_DELAY_HOURS",
+    int(_pick(_profile, "REVIEW_REQUEST_DELAY_HOURS", 3)),
+)
+REVIEW_REQUEST_TEXT = _pick(
+    _profile,
+    "REVIEW_REQUEST_TEXT",
+    "Как прошел визит? Оцените, пожалуйста, сервис:",
+)
+REVIEW_PUBLIC_LINKS = _normalize_str_list(
+    _pick(_profile, "REVIEW_PUBLIC_LINKS", [])
+)
+REVIEW_PUBLIC_TEXT = _pick(
+    _profile,
+    "REVIEW_PUBLIC_TEXT",
+    "Спасибо за высокую оценку. Если удобно, оставьте короткий отзыв по ссылкам:\n{links}",
+)
+REVIEW_NEGATIVE_PROMPT_TEXT = _pick(
+    _profile,
+    "REVIEW_NEGATIVE_PROMPT_TEXT",
+    "Спасибо за честный ответ. Напишите, что нам улучшить, и менеджер свяжется с вами.",
+)
+REVIEW_NEUTRAL_TEXT = _pick(
+    _profile,
+    "REVIEW_NEUTRAL_TEXT",
+    "Спасибо за оценку. Мы уже работаем над улучшениями.",
+)
+REVIEW_THANK_YOU_TEXT = _pick(
+    _profile,
+    "REVIEW_THANK_YOU_TEXT",
+    "Спасибо за отзыв. Мы получили ваше сообщение.",
+)
+MANAGER_NEGATIVE_REVIEW_TITLE = _pick(
+    _profile,
+    "MANAGER_NEGATIVE_REVIEW_TITLE",
+    "⚠️ Негативный отзыв клиента",
 )

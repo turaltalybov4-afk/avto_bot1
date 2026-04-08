@@ -109,7 +109,7 @@ def start_booking_draft(user):
         "client_first_name": user.first_name or "Клиент",
         "client_username": user.username,
         "selected_upsells": [],
-        "last_activity": datetime.datetime.now().isoformat(),
+        "last_activity": get_now_local().isoformat(),
         "inactivity_reminder_sent": False,
     }
 
@@ -286,6 +286,40 @@ def calculate_booking_totals(user_id: int):
     return service_price, upsell_total, service_price + upsell_total
 
 
+def has_client_details(draft: dict) -> bool:
+    required_fields = ("name", "phone", "brand", "model", "comment")
+    return all(str(draft.get(field, "")).strip() for field in required_fields)
+
+
+def is_returning_client(client_id: int) -> bool:
+    now = get_now_local()
+
+    database.cursor.execute("SELECT date, time, status FROM bookings WHERE user_id=?", (client_id,))
+    for date, time, status in database.cursor.fetchall():
+        if status in INACTIVE_BOOKING_STATUSES:
+            continue
+        try:
+            if parse_booking_datetime(date, time) < now:
+                return True
+        except ValueError:
+            continue
+
+    database.cursor.execute("SELECT 1 FROM history WHERE user_id=? LIMIT 1", (client_id,))
+    return database.cursor.fetchone() is not None
+
+
+def get_recommended_upsells(draft: dict):
+    service_name = draft.get("service")
+    upsells = get_upsells_for_service(service_name)
+    if not upsells:
+        return []
+
+    if is_returning_client(draft.get("client_id", 0)):
+        return sorted(upsells, key=lambda x: x["price"], reverse=True)[:2]
+
+    return sorted(upsells, key=lambda x: x["price"])[:1]
+
+
 def build_upsell_prompt(user_id: int):
     draft = user_data_temp[user_id]
     service = get_service_by_name(draft["service"])
@@ -298,6 +332,8 @@ def build_upsell_prompt(user_id: int):
         f"Основная услуга: {service['name']} — {format_money(service_price)}₽",
     ]
     rows = []
+    recommended = get_recommended_upsells(draft)
+    recommended_names = {item["name"] for item in recommended}
 
     if upsells:
         lines.extend([
@@ -315,6 +351,28 @@ def build_upsell_prompt(user_id: int):
                         callback_data=f"upsell_{upsell['name']}",
                     )
                 ]
+            )
+
+    if recommended:
+        lines.extend(
+            [
+                "",
+                config.UPSELL_SCENARIO_TITLE,
+            ]
+        )
+        for item in recommended:
+            lines.append(f"• {item['name']} — {format_money(item['price'])}₽")
+        lines.append(config.UPSELL_SCENARIO_NOTE)
+
+        if not recommended_names.issubset(selected_names):
+            rows.insert(
+                0,
+                [
+                    InlineKeyboardButton(
+                        config.UPSELL_PACKAGE_BUTTON_TEXT,
+                        callback_data="upsell_pack",
+                    )
+                ],
             )
 
     if selected_names:
@@ -411,7 +469,62 @@ async def forward_client_message_to_managers(
 
 
 def parse_booking_datetime(date: str, time: str):
-    return datetime.datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+    booking_dt = datetime.datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+    if BOT_TZ is not None:
+        booking_dt = booking_dt.replace(tzinfo=BOT_TZ)
+    return booking_dt
+
+
+def build_review_markup(booking_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("⭐ 5", callback_data=f"review_rate_{booking_id}_5"),
+                InlineKeyboardButton("⭐ 4", callback_data=f"review_rate_{booking_id}_4"),
+                InlineKeyboardButton("⭐ 3", callback_data=f"review_rate_{booking_id}_3"),
+            ],
+            [
+                InlineKeyboardButton("⭐ 2", callback_data=f"review_rate_{booking_id}_2"),
+                InlineKeyboardButton("⭐ 1", callback_data=f"review_rate_{booking_id}_1"),
+            ],
+        ]
+    )
+
+
+def build_public_review_links_text() -> str:
+    if not config.REVIEW_PUBLIC_LINKS:
+        return ""
+    return "\n".join(f"• {link}" for link in config.REVIEW_PUBLIC_LINKS)
+
+
+async def notify_managers_negative_review(context: ContextTypes.DEFAULT_TYPE, user, booking_id: int, text: str) -> None:
+    database.cursor.execute(
+        "SELECT review_sentiment, service, date, time FROM bookings WHERE id=? AND user_id=?",
+        (booking_id, user.id),
+    )
+    row = database.cursor.fetchone()
+    if not row:
+        return
+
+    rating, service, date, time = row
+    client_name = escape(user.first_name or "Клиент")
+    client_link = f"<a href=\"tg://user?id={user.id}\">{client_name}</a>"
+    username = f"@{escape(user.username)}" if user.username else "нет"
+
+    manager_text = (
+        f"{config.MANAGER_NEGATIVE_REVIEW_TITLE}\n\n"
+        f"Клиент: {client_link}\n"
+        f"ID клиента: {user.id}\n"
+        f"Username: {username}\n"
+        f"Заявка: #{booking_id}\n"
+        f"Услуга: {escape(str(service))}\n"
+        f"Дата/время: {escape(str(date))} {escape(str(time))}\n"
+        f"Оценка: {rating or 'не указана'}\n"
+        f"Комментарий клиента:\n{escape(text)}"
+    )
+
+    for manager in config.MANAGERS:
+        await context.bot.send_message(manager, manager_text, parse_mode="HTML")
 
 
 def estimate_upsell_total(service_name: str, upsell_details: str, comment: str) -> int:
@@ -478,7 +591,7 @@ def get_client_analytics(client_id: int, exclude_booking_id: Optional[int] = Non
     )
     rows = database.cursor.fetchall()
 
-    now = datetime.datetime.now()
+    now = get_now_local()
     visits = []
     total_revenue = 0
 
@@ -732,8 +845,39 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user_data_temp[user_id]["time"] = time
         touch_booking(user_id, query.from_user)
+        draft = user_data_temp[user_id]
+
+        # Keep previously entered client data during the same booking draft.
+        if has_client_details(draft):
+            user_state.pop(user_id, None)
+            upsell_text, markup = build_upsell_prompt(user_id)
+            await query.edit_message_text(upsell_text, reply_markup=markup)
+            return
+
         user_state[user_id] = "name"
         await query.edit_message_text("Введите ваше имя:", reply_markup=build_prompt_markup())
+        return
+
+    if data == "upsell_pack":
+        if not booking_is_active(user_id) or "service" not in user_data_temp[user_id]:
+            await query.edit_message_text(config.BOOKING_INTRO_TEXT, reply_markup=build_service_keyboard())
+            return
+
+        draft = user_data_temp[user_id]
+        selected = draft.setdefault("selected_upsells", [])
+        selected_names = {item["name"] for item in selected}
+        recommended = get_recommended_upsells(draft)
+        to_add = [item for item in recommended if item["name"] not in selected_names]
+
+        if not to_add:
+            await query.answer("Рекомендованные услуги уже добавлены.", show_alert=True)
+        else:
+            selected.extend(to_add)
+            await query.answer("Рекомендованные услуги добавлены.")
+
+        touch_booking(user_id, query.from_user)
+        upsell_text, markup = build_upsell_prompt(user_id)
+        await query.edit_message_text(upsell_text, reply_markup=markup)
         return
 
     if data.startswith("upsell_"):
@@ -867,6 +1011,50 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Эта запись не найдена или уже обработана.", show_alert=True)
         return
 
+    if data.startswith("review_rate_"):
+        parts = data.split("_")
+        if len(parts) != 4:
+            await query.answer("Некорректный формат оценки.", show_alert=True)
+            return
+
+        booking_id = int(parts[2])
+        rating = int(parts[3])
+
+        database.cursor.execute(
+            """
+            UPDATE bookings
+            SET review_sentiment=?, review_request_sent=1
+            WHERE id=? AND user_id=?
+            """,
+            (rating, booking_id, user_id),
+        )
+        database.conn.commit()
+
+        if database.cursor.rowcount == 0:
+            await query.answer("Отзыв не найден или уже обработан.", show_alert=True)
+            return
+
+        user_state.pop(user_id, None)
+
+        if rating >= 4:
+            links_text = build_public_review_links_text()
+            if links_text:
+                await query.edit_message_text(
+                    config.REVIEW_PUBLIC_TEXT.format(links=links_text),
+                    reply_markup=build_main_menu_markup(),
+                )
+            else:
+                await query.edit_message_text(config.REVIEW_THANK_YOU_TEXT, reply_markup=build_main_menu_markup())
+            return
+
+        if rating == 3:
+            await query.edit_message_text(config.REVIEW_NEUTRAL_TEXT, reply_markup=build_main_menu_markup())
+            return
+
+        user_state[user_id] = f"review_feedback:{booking_id}"
+        await query.edit_message_text(config.REVIEW_NEGATIVE_PROMPT_TEXT, reply_markup=build_prompt_markup())
+        return
+
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -887,6 +1075,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Сообщение отправлено менеджеру. Скоро с вами свяжутся.",
             reply_markup=build_main_menu_markup(),
         )
+        return
+
+    if isinstance(state, str) and state.startswith("review_feedback:"):
+        booking_id = int(state.split(":", 1)[1])
+        feedback_text = text.strip()
+        if not feedback_text:
+            await update.message.reply_text("Напишите, пожалуйста, короткий комментарий.", reply_markup=build_prompt_markup())
+            return
+
+        database.cursor.execute(
+            "UPDATE bookings SET review_text=? WHERE id=? AND user_id=?",
+            (feedback_text, booking_id, user_id),
+        )
+        database.conn.commit()
+
+        await notify_managers_negative_review(context, update.effective_user, booking_id, feedback_text)
+        user_state.pop(user_id, None)
+        await update.message.reply_text(config.REVIEW_THANK_YOU_TEXT, reply_markup=build_main_menu_markup())
         return
 
     if state == "name":
@@ -984,6 +1190,8 @@ async def maybe_send_incomplete_booking_reminders(app: Application, now: datetim
             continue
 
         last_activity = datetime.datetime.fromisoformat(last_activity_raw)
+        if now.tzinfo and last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=now.tzinfo)
         minutes_idle = (now - last_activity).total_seconds() / 60
         if minutes_idle < config.BOOKING_HOLD_MINUTES:
             continue
@@ -1054,11 +1262,11 @@ async def maybe_send_weekly_report(app: Application, now: datetime.datetime):
 
 async def reminder_loop(app: Application):
     while True:
-        now = datetime.datetime.now()
+        now = get_now_local()
 
         database.cursor.execute(
             """
-            SELECT id, user_id, date, time, reminder_24_sent, reminder_2_sent
+            SELECT id, user_id, date, time, reminder_24_sent, reminder_2_sent, review_request_sent
             FROM bookings
             WHERE status IN (?, ?, ?, ?)
             """,
@@ -1066,7 +1274,7 @@ async def reminder_loop(app: Application):
         )
         bookings = database.cursor.fetchall()
 
-        for booking_id, user_id, date, time, reminder_24_sent, reminder_2_sent in bookings:
+        for booking_id, user_id, date, time, reminder_24_sent, reminder_2_sent, review_request_sent in bookings:
             booking_time = parse_booking_datetime(date, time)
             hours_left = (booking_time - now).total_seconds() / 3600
 
@@ -1086,6 +1294,19 @@ async def reminder_loop(app: Application):
                 )
                 database.cursor.execute(
                     "UPDATE bookings SET reminder_2_sent=1 WHERE id=?",
+                    (booking_id,),
+                )
+                database.conn.commit()
+
+            hours_after_visit = (now - booking_time).total_seconds() / 3600
+            if (not review_request_sent) and hours_after_visit >= config.REVIEW_REQUEST_DELAY_HOURS:
+                await app.bot.send_message(
+                    user_id,
+                    config.REVIEW_REQUEST_TEXT,
+                    reply_markup=build_review_markup(booking_id),
+                )
+                database.cursor.execute(
+                    "UPDATE bookings SET review_request_sent=1 WHERE id=?",
                     (booking_id,),
                 )
                 database.conn.commit()

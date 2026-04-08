@@ -74,6 +74,7 @@ UPSELL = {
 }
 
 BOOKING_DAYS_AHEAD = 5
+TIMEZONE = "Asia/Krasnoyarsk"
 TIME_SLOTS = [
     "10:00",
     "11:00",
@@ -123,3 +124,8 @@ MANAGER_CONTACT_REQUEST_TEXT = (
     "ID: {client_id}\n"
     "Username: {username}"
 )
+
+REVIEW_PUBLIC_LINKS = [
+    "https://yandex.ru/maps/",
+    "https://2gis.ru/",
+]

@@ -1,6 +1,6 @@
 TOKEN = "8745064857:AAGkoPZ1Xzas2ZYvUvBxCgWYrYxoe7D9qek"
-MANAGERS = [8673882143]
-DATABASE_FILE = "auto_turbo_service.db"
+MANAGERS = [6271000700]
+DATABASE_FILE = "auto_turbo_service.db"  
 
 COMPANY_NAME = "Turbo Service"
 TAGLINE = "Честная диагностика и понятный ремонт без лишних работ"
@@ -68,6 +68,7 @@ UPSELL = {
 }
 
 BOOKING_DAYS_AHEAD = 5
+TIMEZONE = "Asia/Krasnoyarsk"
 TIME_SLOTS = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
 BOOKING_HOLD_MINUTES = 30
 WEEKLY_REPORT_WEEKDAY = 0
@@ -105,6 +106,11 @@ MANAGER_CONTACT_REQUEST_TEXT = (
     "ID: {client_id}\n"
     "Username: {username}"
 )
+
+REVIEW_PUBLIC_LINKS = [
+    "https://yandex.ru/maps/",
+    "https://2gis.ru/",
+]
 
 CONTACT_MANAGER_PROMPT_TEXT = "✍️ Напишите ваш вопрос в чат, и мы сразу отправим его менеджеру."
 

@@ -54,6 +54,7 @@ UPSELL = {
 }
 
 BOOKING_DAYS_AHEAD = 7
+TIMEZONE = "Asia/Krasnoyarsk"
 TIME_SLOTS = ["10:00", "11:50", "12:00", "13:40", "14:30", "15:20", "16:00"]
 BOOKING_HOLD_MINUTES = 30
 WEEKLY_REPORT_WEEKDAY = 0
@@ -78,7 +79,7 @@ BUTTON_COMING = "✅ Приду"
 BUTTON_CANCEL = "❌ Отменить"
 BUTTON_RESCHEDULE = "🔁 Перенести"
 
-ONTACT_MANAGER_TEXT = (
+CONTACT_MANAGER_TEXT = (
     "📞 Связь с менеджером\n\n"
     + "Напишите менеджеру: {manager_link}\n"
     + "ID менеджера: {manager_id}\n\n"
@@ -91,3 +92,8 @@ MANAGER_CONTACT_REQUEST_TEXT = (
     + "ID: {client_id}\n"
     + "Username: {username}"
 )
+
+REVIEW_PUBLIC_LINKS = [
+    "https://yandex.ru/maps/",
+    "https://2gis.ru/",
+]

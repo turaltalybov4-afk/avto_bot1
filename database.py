@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS bookings (
     upsell_total INTEGER DEFAULT 0,
     total_price INTEGER DEFAULT 0,
     reminder_24_sent INTEGER DEFAULT 0,
-    reminder_2_sent INTEGER DEFAULT 0
+    reminder_2_sent INTEGER DEFAULT 0,
+    review_request_sent INTEGER DEFAULT 0,
+    review_sentiment INTEGER,
+    review_text TEXT DEFAULT ''
 )
 """)
 
@@ -54,6 +57,15 @@ if "upsell_total" not in booking_columns:
 
 if "total_price" not in booking_columns:
     cursor.execute("ALTER TABLE bookings ADD COLUMN total_price INTEGER DEFAULT 0")
+
+if "review_request_sent" not in booking_columns:
+    cursor.execute("ALTER TABLE bookings ADD COLUMN review_request_sent INTEGER DEFAULT 0")
+
+if "review_sentiment" not in booking_columns:
+    cursor.execute("ALTER TABLE bookings ADD COLUMN review_sentiment INTEGER")
+
+if "review_text" not in booking_columns:
+    cursor.execute("ALTER TABLE bookings ADD COLUMN review_text TEXT DEFAULT ''")
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS history (
