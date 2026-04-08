@@ -1,0 +1,4 @@
+config.json
+avito_potato.db
+__pycache__/
+*.pyc

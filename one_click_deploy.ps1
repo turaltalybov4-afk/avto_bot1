@@ -85,7 +85,14 @@ REPO_URL='$rRepoUrl'
 BRANCH='$rBranch'
 SKIP_BOOTSTRAP='$rSkipBootstrap'
 
-[ -d /tmp/setup_repo/.git ] && git -C /tmp/setup_repo pull origin "`$BRANCH" || git clone "`$REPO_URL" /tmp/setup_repo
+if [ -d /tmp/setup_repo/.git ]; then
+    if [ -n "`$(git -C /tmp/setup_repo status --porcelain)" ]; then
+        git -C /tmp/setup_repo stash push -u -m "autodeploy-setup-repo-`$(date +%Y%m%d-%H%M%S)" || true
+    fi
+    git -C /tmp/setup_repo pull origin "`$BRANCH"
+else
+    git clone "`$REPO_URL" /tmp/setup_repo
+fi
 
 [ "`$SKIP_BOOTSTRAP" = "1" ] || [ -f "/etc/systemd/system/`$SERVICE_NAME.service" ] || {
     id "`$BOT_USER" > /dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "`$BOT_USER"
@@ -97,7 +104,13 @@ SKIP_BOOTSTRAP='$rSkipBootstrap'
     systemctl daemon-reload
 }
 
-[ -d "`$REPO_DIR/.git" ] || git clone "`$REPO_URL" "`$REPO_DIR"
+if [ -d "`$REPO_DIR/.git" ]; then
+    if [ -n "`$(git -C "`$REPO_DIR" status --porcelain)" ]; then
+        git -C "`$REPO_DIR" stash push -u -m "autodeploy-target-repo-`$(date +%Y%m%d-%H%M%S)" || true
+    fi
+else
+    git clone "`$REPO_URL" "`$REPO_DIR"
+fi
 cd "`$REPO_DIR"
 git pull origin "`$BRANCH"
 
