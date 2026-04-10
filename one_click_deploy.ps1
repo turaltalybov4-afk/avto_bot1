@@ -155,10 +155,33 @@ systemctl kill --signal=SIGKILL "`$SERVICE_NAME" 2>/dev/null || true
 systemctl reset-failed "`$SERVICE_NAME" || true
 systemctl restart "`$SERVICE_NAME"
 
-systemctl is-enabled "`$SERVICE_NAME"
-systemctl is-active "`$SERVICE_NAME"
-systemctl status "`$SERVICE_NAME" --no-pager
-journalctl -u "`$SERVICE_NAME" -n 30 --no-pager || true
+systemctl is-enabled "`$SERVICE_NAME" >/dev/null
+
+# Give systemd a short window to bring the service up before deciding it's failed.
+ATTEMPTS=30
+SLEEP_SEC=1
+STATE="unknown"
+for i in `$(seq 1 "`$ATTEMPTS"); do
+    STATE="`$(systemctl is-active "`$SERVICE_NAME" || true)"
+    if [ "`$STATE" = "active" ]; then
+        break
+    fi
+    if [ "`$STATE" = "failed" ]; then
+        break
+    fi
+    sleep "`$SLEEP_SEC"
+done
+
+if [ "`$STATE" != "active" ]; then
+    echo "ERROR: service '`$SERVICE_NAME' is '`$STATE' after restart"
+    echo "--- systemctl status (tail) ---"
+    systemctl status "`$SERVICE_NAME" --no-pager | tail -n 30 || true
+    echo "--- journal (last 40 lines, recent) ---"
+    journalctl -u "`$SERVICE_NAME" -n 40 --since "-10 min" --no-pager || true
+    exit 1
+fi
+
+echo "Service '`$SERVICE_NAME' is active"
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""
