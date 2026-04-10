@@ -68,6 +68,11 @@ if ($ReuseSshSession) {
     )
 }
 
+function Invoke-RemoteDeploy([string[]]$ExtraSshArgs) {
+    $remoteScript | ssh @ExtraSshArgs $target "bash -se"
+    return $LASTEXITCODE
+}
+
 $rRepoDir = ConvertTo-SingleQuoteEscaped $RepoDir
 $rServiceName = ConvertTo-SingleQuoteEscaped $ServiceName
 $rBotUser = ConvertTo-SingleQuoteEscaped $BotUser
@@ -157,9 +162,14 @@ journalctl -u "`$SERVICE_NAME" -n 30 --no-pager || true
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""
-$remoteScript | ssh @sshArgs $target "bash -se"
-if ($LASTEXITCODE -ne 0) {
-    throw "Remote deploy failed with exit code $LASTEXITCODE"
+$exitCode = Invoke-RemoteDeploy -ExtraSshArgs $sshArgs
+if ($exitCode -ne 0 -and $ReuseSshSession) {
+    Write-Host "SSH session reuse failed, retrying without multiplexing..." -ForegroundColor Yellow
+    $exitCode = Invoke-RemoteDeploy -ExtraSshArgs @()
+}
+
+if ($exitCode -ne 0) {
+    throw "Remote deploy failed with exit code $exitCode"
 }
 
 Write-Host "[3/4] Done." -ForegroundColor Green

@@ -14,7 +14,13 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 $enableSshSessionReuse = -not $NoSshSessionReuse
-$sshControlPath = "~/.ssh/autobot-$($ServerIp)-%r@%h:%p"
+$isWindowsHost = $env:OS -eq "Windows_NT"
+if ($isWindowsHost) {
+    $sshControlPath = (Join-Path $env:TEMP "autobot-ssh-$($ServerIp)-%r-%h-%p") -replace "\\", "/"
+}
+else {
+    $sshControlPath = "~/.ssh/autobot-$($ServerIp)-%r-%h-%p"
+}
 
 function Get-DeployTarget([int]$Number) {
     if ($Number -lt 1) {
@@ -109,6 +115,9 @@ function Invoke-Deploy([int]$Number, [string]$Profile, [string]$Token, [string]$
     }
 
     & powershell @deployArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deploy failed for bot #$Number with exit code $LASTEXITCODE"
+    }
 
     Write-Host ""
     Write-Host "Done. Quick check:" -ForegroundColor Green
