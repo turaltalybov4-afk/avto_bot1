@@ -102,7 +102,14 @@ REPO_URL='$rRepoUrl'
 BRANCH='$rBranch'
 SKIP_BOOTSTRAP='$rSkipBootstrap'
 
+ensure_safe_directory() {
+    local repo_path="`$1"
+    [ -z "`$repo_path" ] && return 0
+    git config --global --add safe.directory "`$repo_path" 2>/dev/null || true
+}
+
 if [ -d /tmp/setup_repo/.git ]; then
+    ensure_safe_directory /tmp/setup_repo
     if [ -n "`$(git -C /tmp/setup_repo status --porcelain)" ]; then
         git -C /tmp/setup_repo stash push -u -m "autodeploy-setup-repo-`$(date +%Y%m%d-%H%M%S)" || true
     fi
@@ -122,11 +129,13 @@ fi
 }
 
 if [ -d "`$REPO_DIR/.git" ]; then
+    ensure_safe_directory "`$REPO_DIR"
     if [ -n "`$(git -C "`$REPO_DIR" status --porcelain)" ]; then
         git -C "`$REPO_DIR" stash push -u -m "autodeploy-target-repo-`$(date +%Y%m%d-%H%M%S)" || true
     fi
 else
     git clone "`$REPO_URL" "`$REPO_DIR"
+    ensure_safe_directory "`$REPO_DIR"
 fi
 cd "`$REPO_DIR"
 git pull origin "`$BRANCH"
