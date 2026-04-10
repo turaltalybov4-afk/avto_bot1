@@ -68,9 +68,9 @@ if ($ReuseSshSession) {
     )
 }
 
-function Invoke-RemoteDeploy([string[]]$ExtraSshArgs) {
+function Invoke-RemoteDeploy([string[]]$ExtraSshArgs, [ref]$ExitCode) {
     $remoteScript | ssh @ExtraSshArgs $target "bash -se"
-    return $LASTEXITCODE
+    $ExitCode.Value = $LASTEXITCODE
 }
 
 $rRepoDir = ConvertTo-SingleQuoteEscaped $RepoDir
@@ -185,10 +185,11 @@ echo "Service '`$SERVICE_NAME' is active"
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""
-$exitCode = Invoke-RemoteDeploy -ExtraSshArgs $sshArgs
+$exitCode = 0
+Invoke-RemoteDeploy -ExtraSshArgs $sshArgs -ExitCode ([ref]$exitCode)
 if ($exitCode -ne 0 -and $ReuseSshSession) {
     Write-Host "SSH session reuse failed, retrying without multiplexing..." -ForegroundColor Yellow
-    $exitCode = Invoke-RemoteDeploy -ExtraSshArgs @()
+    Invoke-RemoteDeploy -ExtraSshArgs @() -ExitCode ([ref]$exitCode)
 }
 
 if ($exitCode -ne 0) {
