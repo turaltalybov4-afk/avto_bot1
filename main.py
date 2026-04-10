@@ -20,6 +20,7 @@ import database
 
 user_state = {}
 user_data_temp = {}
+reschedule_prefill_users = set()
 maintenance_mode = False
 BUSY_STATUSES = ("booked", "confirmed_by_client", "pending", "approved")
 ACTIVE_BOOKING_STATUSES = ("booked", "confirmed_by_client", "pending", "approved")
@@ -85,6 +86,7 @@ def booking_is_active(user_id: int) -> bool:
 def reset_booking_state(user_id: int):
     user_state.pop(user_id, None)
     user_data_temp.pop(user_id, None)
+    reschedule_prefill_users.discard(user_id)
 
 
 def touch_booking(user_id: int, user=None):
@@ -112,6 +114,55 @@ def start_booking_draft(user):
         "last_activity": get_now_local().isoformat(),
         "inactivity_reminder_sent": False,
     }
+
+
+def get_saved_client_details(client_id: int) -> dict:
+    database.cursor.execute(
+        "SELECT name, phone, car_brand, car_model FROM clients WHERE user_id=?",
+        (client_id,),
+    )
+    row = database.cursor.fetchone()
+    if not row:
+        return {}
+
+    name, phone, brand, model = row
+
+    database.cursor.execute(
+        """
+        SELECT comment
+        FROM bookings
+        WHERE user_id=? AND comment IS NOT NULL AND TRIM(comment) != ''
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (client_id,),
+    )
+    comment_row = database.cursor.fetchone()
+    comment = ""
+    if comment_row and comment_row[0]:
+        comment = "\n".join(
+            line for line in str(comment_row[0]).splitlines() if not line.startswith("Доп. услуги:")
+        ).strip()
+
+    details = {
+        "name": (name or "").strip(),
+        "phone": (phone or "").strip(),
+        "brand": (brand or "").strip(),
+        "model": (model or "").strip(),
+        "comment": comment,
+    }
+    return {key: value for key, value in details.items() if value}
+
+
+def prefill_draft_client_details(user_id: int):
+    if user_id not in user_data_temp:
+        return
+
+    saved = get_saved_client_details(user_id)
+    if not saved:
+        return
+
+    user_data_temp[user_id].update(saved)
 
 
 def build_main_menu_markup() -> InlineKeyboardMarkup:
@@ -770,6 +821,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "start_booking":
         start_booking_draft(query.from_user)
+        if user_id in reschedule_prefill_users:
+            prefill_draft_client_details(user_id)
+            reschedule_prefill_users.discard(user_id)
         await query.edit_message_text(config.BOOKING_INTRO_TEXT, reply_markup=build_service_keyboard())
         return
 
@@ -1001,6 +1055,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         database.conn.commit()
 
         if database.cursor.rowcount:
+            reschedule_prefill_users.add(user_id)
             await query.edit_message_text(
                 "🔁 Запрос на перенос принят. Нажмите «Записаться», чтобы выбрать новую дату и время.",
                 reply_markup=build_main_menu_markup(),

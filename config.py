@@ -103,11 +103,25 @@ PROFILE_SLUG = PROFILE_NAME
 
 DEFAULT_DATABASE_FILE = "auto.db" if PROFILE_NAME == "default" else f"auto_{PROFILE_NAME}.db"
 
+
+def _resolve_database_file() -> str:
+    profile_default = _pick(_profile, "DATABASE_FILE", DEFAULT_DATABASE_FILE)
+    env_value = os.getenv("AUTOBOT_DATABASE_FILE")
+    if env_value is None or not env_value.strip():
+        return profile_default
+
+    env_value = env_value.strip()
+    # Protect non-default profiles from accidentally sharing default DB via .env template.
+    if PROFILE_NAME != "default" and Path(env_value).name.lower() == "auto.db":
+        return profile_default
+
+    return env_value
+
 # Environment values have priority for deployment simplicity.
 # Profile values are used as fallback defaults.
 TOKEN = _env_str("BOT_TOKEN", _pick(_profile, "TOKEN", ""))
 MANAGERS = _env_list_of_ints("AUTOBOT_MANAGERS", _pick(_profile, "MANAGERS", []))
-DATABASE_FILE = _env_str("AUTOBOT_DATABASE_FILE", _pick(_profile, "DATABASE_FILE", DEFAULT_DATABASE_FILE))
+DATABASE_FILE = _resolve_database_file()
 
 COMPANY_NAME = _pick(_profile, "COMPANY_NAME", "Автосервис")
 TAGLINE = _pick(_profile, "TAGLINE", "")

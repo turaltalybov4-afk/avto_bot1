@@ -7,11 +7,14 @@ param(
     [switch]$DeployAll,
     [switch]$UseSavedConfig,
     [switch]$Yes,
-    [string]$ConfigFile = "deploy_bots.json"
+    [string]$ConfigFile = "deploy_bots.json",
+    [switch]$NoSshSessionReuse
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
+$enableSshSessionReuse = -not $NoSshSessionReuse
+$sshControlPath = "~/.ssh/autobot-$($ServerIp)-%r@%h:%p"
 
 function Get-DeployTarget([int]$Number) {
     if ($Number -lt 1) {
@@ -84,18 +87,28 @@ function Invoke-Deploy([int]$Number, [string]$Profile, [string]$Token, [string]$
     Write-Host "EnvFile:     $($target.EnvFile)"
     Write-Host ""
 
-    powershell -ExecutionPolicy Bypass -File ".\one_click_deploy.ps1" `
-        -ServerIp $ServerIp `
-        -ServiceName $target.ServiceName `
-        -BotUser $target.BotUser `
-        -RepoDir $target.RepoDir `
-        -DataDir $target.DataDir `
-        -EnvFile $target.EnvFile `
-        -BotToken $Token `
-        -ManagerIds $ManagerIds `
-        -ClientKey $Profile `
-        -RepoUrl $RepoUrl `
-        -Branch $Branch
+    $deployArgs = @(
+        "-ExecutionPolicy", "Bypass",
+        "-File", ".\\one_click_deploy.ps1",
+        "-ServerIp", $ServerIp,
+        "-ServiceName", $target.ServiceName,
+        "-BotUser", $target.BotUser,
+        "-RepoDir", $target.RepoDir,
+        "-DataDir", $target.DataDir,
+        "-EnvFile", $target.EnvFile,
+        "-BotToken", $Token,
+        "-ManagerIds", $ManagerIds,
+        "-ClientKey", $Profile,
+        "-RepoUrl", $RepoUrl,
+        "-Branch", $Branch,
+        "-SshControlPath", $sshControlPath
+    )
+
+    if ($enableSshSessionReuse) {
+        $deployArgs += "-ReuseSshSession"
+    }
+
+    & powershell @deployArgs
 
     Write-Host ""
     Write-Host "Done. Quick check:" -ForegroundColor Green

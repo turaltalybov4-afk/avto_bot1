@@ -17,7 +17,10 @@ param(
     [string]$EnvFile = "/etc/auto_bot.env",
     [string]$RepoUrl = "",
     [string]$Branch = "main",
-    [switch]$SkipBootstrap
+    [switch]$SkipBootstrap,
+    [switch]$ReuseSshSession,
+    [string]$SshControlPath = "~/.ssh/autobot-%r@%h:%p",
+    [int]$SshControlPersistMinutes = 30
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,6 +58,15 @@ if ([string]::IsNullOrWhiteSpace($repoUrlValue)) {
 
 Write-Host "[2/4] Deploy to VPS..." -ForegroundColor Green
 $target = "$SshUser@$ServerIp"
+$sshArgs = @()
+if ($ReuseSshSession) {
+    $persistMinutes = [Math]::Max($SshControlPersistMinutes, 1)
+    $sshArgs += @(
+        "-o", "ControlMaster=auto",
+        "-o", "ControlPersist=${persistMinutes}m",
+        "-o", "ControlPath=$SshControlPath"
+    )
+}
 
 $rRepoDir = ConvertTo-SingleQuoteEscaped $RepoDir
 $rServiceName = ConvertTo-SingleQuoteEscaped $ServiceName
@@ -145,7 +157,7 @@ journalctl -u "`$SERVICE_NAME" -n 30 --no-pager || true
 "@
 
 $remoteScript = $remoteScript -replace "`r", ""
-$remoteScript | ssh $target "bash -se"
+$remoteScript | ssh @sshArgs $target "bash -se"
 if ($LASTEXITCODE -ne 0) {
     throw "Remote deploy failed with exit code $LASTEXITCODE"
 }

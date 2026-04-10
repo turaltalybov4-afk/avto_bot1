@@ -1,24 +1,14 @@
 {
+  "avito_api_base": "https://api.avito.ru",
+  "avito_access_token": "PUT_AVITO_ACCESS_TOKEN_HERE",
+  "avito_chat_id_field": "chat_id",
   "telegram_bot_token": "PUT_TELEGRAM_BOT_TOKEN_HERE",
   "telegram_manager_chat_id": "PUT_MANAGER_CHAT_ID_HERE",
+  "port": 8088,
   "default_price_per_bag": 1200,
   "default_bag_weight_kg": 25,
   "delivery_windows": [
     "днем",
     "вечером после обеда"
-  ],
-  "faq_answers": {
-    "price": [
-      "Картошка сейчас {price} руб за мешок.",
-      "Актуальная цена: {price} руб за мешок."
-    ],
-    "weight": [
-      "Обычно в одном мешке {weight} кг.",
-      "Стандартный мешок: {weight} кг."
-    ],
-    "delivery": [
-      "Доставка есть: обычно днем или вечером после обеда.",
-      "Можем доставить днем или вечером после обеда."
-    ]
-  }
+  ]
 }
